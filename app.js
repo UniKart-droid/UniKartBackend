@@ -13,7 +13,7 @@ import noticeRoutes from "./routes/noticeRoutes.js";
 
 import http from "http";
 import { Server } from "socket.io";
-
+import path from "path";
 import Chat from "./model/Chat.js";
 import Message from "./model/Message.js";
 
@@ -52,6 +52,20 @@ app.get("/api/health", (req, res) => {
 });
 
 /* ---------------------------
+    PRODUCTION SETUP 
+---------------------------- */
+if (process.env.NODE_ENV === "production") {
+  const dirPath = path.resolve();
+  app.use(express.static(path.join(dirPath, "./Frontend/dist")));
+  app.use((req, res, next) => {
+    if (req.method === "GET" && !req.path.startsWith("/api/")) {
+      return res.sendFile(path.resolve(dirPath, "./Frontend/dist", "index.html"));
+    }
+    next();
+  });
+}
+
+/* ---------------------------
     CREATE HTTP SERVER
 ---------------------------- */
 const server = http.createServer(app);
@@ -61,7 +75,7 @@ const server = http.createServer(app);
 ---------------------------- */
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", 
+    origin: "http://localhost:5173",
     methods: ["GET", "POST"],
   },
 });
@@ -97,20 +111,19 @@ io.on("connection", (socket) => {
 
       const { sender, receiver, message, chatId } = data;
 
-      // Consistent ID generator logic
       const finalChatId = chatId || getConsistentChatId(sender, receiver);
 
-      /* 🔥 VALIDATION */
+      /*  VALIDATION */
       if (!finalChatId || !sender || !receiver || !message) {
         console.log(" Invalid message data:", { finalChatId, sender, receiver, message });
         return;
       }
 
-      /* 🔥 ENSURE CHAT EXISTS */
+      /*  ENSURE CHAT EXISTS */
       let chat = await Chat.findOne({ chatId: finalChatId });
 
       if (!chat) {
-        console.log("⚠️ Chat not found, creating new one");
+        console.log(" Chat not found, creating new one");
         chat = await Chat.create({
           chatId: finalChatId,
           members: [sender, receiver],
@@ -118,12 +131,11 @@ io.on("connection", (socket) => {
         });
       }
 
-
       const savedMessage = await Message.create({
         chatId: finalChatId,
         sender,
         receiver,
-        text: message, 
+        text: message,
       });
 
       console.log(" MESSAGE SAVED:", savedMessage._id);
@@ -138,7 +150,7 @@ io.on("connection", (socket) => {
         chatId: finalChatId,
         sender: savedMessage.sender,
         receiver: savedMessage.receiver,
-        text: savedMessage.text, 
+        text: savedMessage.text,
         createdAt: savedMessage.createdAt,
       });
 
