@@ -52,16 +52,20 @@ app.get("/api/health", (req, res) => {
 });
 
 /* ---------------------------
-    PRODUCTION SETUP 
+    PRODUCTION SETUP (FIXED)
 ---------------------------- */
 if (process.env.NODE_ENV === "production") {
   const dirPath = path.resolve();
-  app.use(express.static(path.join(dirPath, "./Frontend/dist")));
-  app.use((req, res, next) => {
-    if (req.method === "GET" && !req.path.startsWith("/api/")) {
-      return res.sendFile(path.resolve(dirPath, "./Frontend/dist", "index.html"));
-    }
-    next();
+
+  const frontendPath = path.join(dirPath, "Frontend", "dist");
+
+  console.log("📦 Serving frontend from:", frontendPath);
+
+  app.use(express.static(frontendPath));
+
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/")) return next();
+    res.sendFile(path.join(frontendPath, "index.html"));
   });
 }
 
@@ -75,8 +79,10 @@ const server = http.createServer(app);
 ---------------------------- */
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173",
-    "https://unikartbackend-6.onrender.com"],
+    origin: [
+      "http://localhost:5173",
+      "https://unikartbackend-6.onrender.com",
+    ],
     methods: ["GET", "POST"],
   },
 });
@@ -114,13 +120,18 @@ io.on("connection", (socket) => {
 
       const finalChatId = chatId || getConsistentChatId(sender, receiver);
 
-      /*  VALIDATION */
+      /* VALIDATION */
       if (!finalChatId || !sender || !receiver || !message) {
-        console.log(" Invalid message data:", { finalChatId, sender, receiver, message });
+        console.log(" Invalid message data:", {
+          finalChatId,
+          sender,
+          receiver,
+          message,
+        });
         return;
       }
 
-      /*  ENSURE CHAT EXISTS */
+      /* ENSURE CHAT EXISTS */
       let chat = await Chat.findOne({ chatId: finalChatId });
 
       if (!chat) {
@@ -141,7 +152,7 @@ io.on("connection", (socket) => {
 
       console.log(" MESSAGE SAVED:", savedMessage._id);
 
-      /*  UPDATE CHAT COLLECTION */
+      /* UPDATE CHAT */
       chat.lastMessage = message;
       chat.updatedAt = Date.now();
       await chat.save();
