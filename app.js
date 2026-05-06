@@ -63,8 +63,11 @@ if (process.env.NODE_ENV === "production") {
 
   app.use(express.static(frontendPath));
 
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/")) return next();
+  // SAFE fallback (NO wildcard route issues)
+  app.use((req, res, next) => {
+    if (req.method !== "GET") return next();
+    if (req.path.startsWith("/api")) return next();
+
     res.sendFile(path.join(frontendPath, "index.html"));
   });
 }
